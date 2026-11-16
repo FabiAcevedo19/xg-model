@@ -1,6 +1,9 @@
 # ⚽ Expected Goals (xG) Model
 
 ![tests](https://github.com/FabiAcevedo19/xg-model/actions/workflows/tests.yml/badge.svg)
+[![Open in Streamlit](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://xg-explorer.streamlit.app/)
+
+**▶ Live demo: [xg-explorer.streamlit.app](https://xg-explorer.streamlit.app/)**
 
 A machine learning model that predicts the probability that a soccer shot becomes a goal. It is trained on about 45,000 shots from ten competitions and uses the position of every defender and the goalkeeper at the moment of the shot.
 
@@ -8,11 +11,11 @@ A machine learning model that predicts the probability that a soccer shot become
 
 ![Shot map](figures/shot_map_world_cup_2022.png)
 
-> 🚧 Live demo link goes here once the app is deployed. Until then, run it locally with `streamlit run app.py`.
-
 ## The app
 
-[app.py](app.py) is an interactive explorer. Click on the pitch to move the ball, the goalkeeper and defenders, and the xG updates.
+![The xG Explorer app](figures/app_screenshot.jpg)
+
+[Try it live](https://xg-explorer.streamlit.app/). [app.py](app.py) is an interactive explorer. Click on the pitch to move the ball, the goalkeeper and defenders, and the xG updates.
 
 - **Six preset situations**, from a one-on-one to a crowded penalty box.
 - **Replay the 2022 World Cup final**: load any of its 27 non-penalty shots with the real player positions, and compare the model's xG with StatsBomb's and with what happened.
@@ -114,7 +117,7 @@ They did not help. Cross-validated log-loss was 0.2467 with them and 0.2461 with
 - [x] Evaluate: held-out tournament, grouped cross-validation, bootstrap intervals
 - [x] Unit tests and continuous integration
 - [x] Interactive Streamlit app: place the ball, defenders and keeper, get the xG
-- [ ] Deploy to Hugging Face Spaces
+- [x] Deploy to Streamlit Community Cloud
 - [ ] Analysis: which players outperformed their xG?
 
 ## Run it yourself

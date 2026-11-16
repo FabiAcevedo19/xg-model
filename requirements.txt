@@ -1,4 +1,4 @@
-statsbombpy
+requests
 pandas
 numpy
 matplotlib

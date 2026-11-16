@@ -28,6 +28,13 @@ DEFENDER_RADIUS = 0.5
 KEEPER_RADIUS = 1.0
 N_RAYS = 100
 
+# Kinematics of a save. Pitch units are roughly yards; time is in seconds.
+BALL_SPEED_FOOT = 25.0    # about 23 m/s (80 km/h): a firmly struck shot
+BALL_SPEED_HEAD = 14.0    # headers travel much slower
+KEEPER_REACTION = 0.25    # time before the keeper starts to move
+KEEPER_SPEED = 5.5        # about 5 m/s: average speed of a step and a dive
+N_PATH_POINTS = 20        # points checked along each ray
+
 BASIC_FEATURES = [
     "distance", "angle_deg", "is_header", "is_free_kick", "is_volley",
     "first_time", "under_pressure", "from_counter",
@@ -37,7 +44,8 @@ FREEZE_FRAME_FEATURES = [
     "nearest_defender_dist", "gk_dist_from_goal", "gk_off_line",
     "gk_dist_to_shot",
 ]
-ALL_FEATURES = BASIC_FEATURES + FREEZE_FRAME_FEATURES
+KINEMATIC_FEATURES = ["unsaveable_fraction", "scoring_window_deg"]
+ALL_FEATURES = BASIC_FEATURES + FREEZE_FRAME_FEATURES + KINEMATIC_FEATURES
 
 # Physics we know before seeing any data: +1 means "more of this can only
 # raise the goal probability", -1 means it can only lower it. The XGBoost
@@ -47,6 +55,8 @@ MONOTONE = {
     "angle_deg": +1,
     "open_goal_fraction": +1,
     "free_angle_deg": +1,
+    "unsaveable_fraction": +1,
+    "scoring_window_deg": +1,
     "defenders_in_cone": -1,
 }
 
@@ -119,19 +129,62 @@ def open_goal_fraction(shot, blockers, radii, n_rays=N_RAYS):
     points between the posts. A ray is blocked if any opposing player's body
     (a circle of the given radius) touches it. 1.0 means nothing in the way.
     """
-    blockers = np.asarray(blockers, dtype=float).reshape(-1, 2)
-    if len(blockers) == 0:
-        return 1.0
-    targets = np.column_stack([
+    return 1.0 - rays_blocked(shot, blockers, radii, n_rays).mean()
+
+
+def _goal_targets(n_rays=N_RAYS):
+    """n_rays points evenly spaced along the goal line between the posts."""
+    return np.column_stack([
         np.full(n_rays, GOAL_X),
         np.linspace(LEFT_POST[1], RIGHT_POST[1], n_rays),
     ])
-    dist = _distance_to_segments(blockers, np.asarray(shot, dtype=float), targets)
-    blocked = (dist < np.asarray(radii, dtype=float)[:, None]).any(axis=0)
-    return 1.0 - blocked.mean()
 
 
-def freeze_frame_features(x, y, frame_text):
+def rays_blocked(shot, blockers, radii, n_rays=N_RAYS):
+    """For each ray from the ball to the goal: is a player's body in the way?"""
+    blockers = np.asarray(blockers, dtype=float).reshape(-1, 2)
+    if len(blockers) == 0:
+        return np.zeros(n_rays, dtype=bool)
+    dist = _distance_to_segments(blockers, np.asarray(shot, dtype=float),
+                                 _goal_targets(n_rays))
+    return (dist < np.asarray(radii, dtype=float)[:, None]).any(axis=0)
+
+
+# --------------------------------------------------------------------------
+# 3. Goalkeeper kinematics: can the keeper get there in time?
+# --------------------------------------------------------------------------
+
+def rays_saveable(shot, keeper, ball_speed=BALL_SPEED_FOOT, n_rays=N_RAYS):
+    """For each ray from the ball to the goal: can the keeper reach it in time?
+
+    A static circle ignores the fact that keepers move. Here the ball and the
+    keeper race each other:
+
+      * The ball travels along the ray at constant speed, so it reaches a
+        point at distance d after  t = d / ball_speed.
+      * The keeper waits KEEPER_REACTION seconds, then moves at KEEPER_SPEED.
+        By time t they can cover  KEEPER_RADIUS + KEEPER_SPEED * (t - reaction).
+
+    The ray is saveable if, at any point along it, the keeper can be there
+    by the time the ball is. Close-range shots leave no time to move, so
+    almost everything outside the keeper's body is unsaveable. This is a 2D
+    model: it ignores the height of the shot.
+    """
+    shot = np.asarray(shot, dtype=float)
+    keeper = np.asarray(keeper, dtype=float)
+    targets = _goal_targets(n_rays)                           # (n, 2)
+    steps = np.linspace(0.0, 1.0, N_PATH_POINTS)              # (m,)
+    # Every checked point on every ray: shape (n, m, 2)
+    path = shot + steps[None, :, None] * (targets - shot)[:, None, :]
+
+    ball_time = np.linalg.norm(path - shot, axis=2) / ball_speed
+    keeper_range = KEEPER_RADIUS + KEEPER_SPEED * np.maximum(
+        0.0, ball_time - KEEPER_REACTION)
+    keeper_needs = np.linalg.norm(path - keeper, axis=2)
+    return (keeper_needs <= keeper_range).any(axis=1)
+
+
+def freeze_frame_features(x, y, frame_text, is_header=False):
     """All defender and goalkeeper features for one shot.
 
     frame_text is JSON: a list of [x, y, is_teammate, is_goalkeeper].
@@ -141,20 +194,32 @@ def freeze_frame_features(x, y, frame_text):
     opponents = players[players[:, 2] == 0]
     defenders = opponents[opponents[:, 3] == 0][:, :2]
     keepers = opponents[opponents[:, 3] == 1][:, :2]
+    angle_deg = float(np.degrees(shot_angle(x, y)))
 
     blockers = np.vstack([defenders, keepers])
     radii = np.r_[np.full(len(defenders), DEFENDER_RADIUS),
                   np.full(len(keepers), KEEPER_RADIUS)]
     open_fraction = open_goal_fraction(shot, blockers, radii)
 
+    # Kinematic view: a ray scores only if no defender blocks it AND the
+    # keeper cannot get to it in time.
+    blocked = rays_blocked(shot, defenders, np.full(len(defenders), DEFENDER_RADIUS))
+    if len(keepers):
+        saveable = rays_saveable(
+            shot, keepers[0], BALL_SPEED_HEAD if is_header else BALL_SPEED_FOOT)
+    else:
+        saveable = np.zeros(N_RAYS, dtype=bool)
+
     out = {
         "open_goal_fraction": open_fraction,
-        "free_angle_deg": float(np.degrees(shot_angle(x, y))) * open_fraction,
+        "free_angle_deg": angle_deg * open_fraction,
         "defenders_in_cone": int(in_shot_cone(defenders, shot).sum()) if len(defenders) else 0,
         "nearest_defender_dist": np.nan,
         "gk_dist_from_goal": np.nan,
         "gk_off_line": np.nan,
         "gk_dist_to_shot": np.nan,
+        "unsaveable_fraction": 1.0 - saveable.mean(),
+        "scoring_window_deg": angle_deg * (~blocked & ~saveable).mean(),
     }
     if len(defenders):
         out["nearest_defender_dist"] = np.linalg.norm(defenders - shot, axis=1).min()
@@ -188,8 +253,9 @@ def build_features(shots: pd.DataFrame) -> pd.DataFrame:
     X["from_counter"] = (shots["play_pattern"] == "From Counter").astype(int)
 
     frames = pd.DataFrame(
-        [freeze_frame_features(x, y, f)
-         for x, y, f in zip(shots["x"], shots["y"], shots["freeze_frame"])],
+        [freeze_frame_features(x, y, f, is_header=h)
+         for x, y, f, h in zip(shots["x"], shots["y"], shots["freeze_frame"],
+                               shots["body_part"] == "Head")],
         index=shots.index,
     )
     return pd.concat([X, frames], axis=1)[ALL_FEATURES]

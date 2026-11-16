@@ -13,10 +13,40 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
-from features import (freeze_frame_features, in_shot_cone, open_goal_fraction,
+from features import (BALL_SPEED_FOOT, BALL_SPEED_HEAD, freeze_frame_features,
+                      in_shot_cone, open_goal_fraction, rays_saveable,
                       shot_angle, shot_distance)
 
 PENALTY_SPOT = (108.0, 40.0)  # 12 yards from the goal line, dead centre
+KEEPER_ON_LINE = (119.5, 40.0)
+
+
+def test_keeper_saves_everything_from_long_range():
+    # From 30 yards the ball takes 1.2 s. After a 0.25 s reaction the keeper
+    # covers 1 + 5.5 * 0.95 = 6.2 yards, more than the 4 to either post.
+    assert rays_saveable((90.0, 40.0), KEEPER_ON_LINE).all()
+
+
+def test_keeper_has_no_time_at_point_blank_range():
+    # From 3 yards the ball arrives in 0.12 s, before the keeper can react.
+    # A keeper standing at the far post only covers what their body covers.
+    saveable = rays_saveable((117.0, 40.0), (119.5, 44.0))
+    assert saveable.mean() < 0.3
+
+
+def test_slower_headers_are_easier_to_save():
+    shot, keeper = (110.0, 34.0), (119.0, 41.0)
+    foot = rays_saveable(shot, keeper, BALL_SPEED_FOOT).mean()
+    head = rays_saveable(shot, keeper, BALL_SPEED_HEAD).mean()
+    assert head >= foot
+    assert head > 0
+
+
+def test_no_keeper_means_nothing_is_saveable():
+    f = freeze_frame_features(*PENALTY_SPOT, "[]")
+    assert f["unsaveable_fraction"] == 1.0
+    assert f["scoring_window_deg"] == pytest.approx(
+        np.degrees(2 * np.arctan(4 / 12)))
 
 
 def test_distance_from_penalty_spot():

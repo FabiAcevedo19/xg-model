@@ -1,54 +1,182 @@
 {
-  "n_shots": 7509,
-  "n_goals": 668,
-  "correlation_with_statsbomb": 0.8734,
-  "models": {
+  "n_shots": 44997,
+  "n_goals": 4237,
+  "n_development_shots": 43567,
+  "n_test_shots": 1430,
+  "test_competition": "World Cup 2022",
+  "final_model": "XGBoost (+ defender and keeper positions)",
+  "final_features": [
+    "distance",
+    "angle_deg",
+    "is_header",
+    "is_free_kick",
+    "is_volley",
+    "first_time",
+    "under_pressure",
+    "from_counter",
+    "open_goal_fraction",
+    "free_angle_deg",
+    "defenders_in_cone",
+    "nearest_defender_dist",
+    "gk_dist_from_goal",
+    "gk_off_line",
+    "gk_dist_to_shot"
+  ],
+  "chosen_params": {
+    "n_estimators": 600,
+    "learning_rate": 0.03,
+    "max_depth": 3,
+    "min_child_weight": 10
+  },
+  "tuning": [
+    {
+      "n_estimators": 300,
+      "learning_rate": 0.03,
+      "max_depth": 3,
+      "min_child_weight": 10,
+      "cv_log_loss": 0.24678
+    },
+    {
+      "n_estimators": 600,
+      "learning_rate": 0.03,
+      "max_depth": 3,
+      "min_child_weight": 10,
+      "cv_log_loss": 0.24669
+    },
+    {
+      "n_estimators": 600,
+      "learning_rate": 0.03,
+      "max_depth": 4,
+      "min_child_weight": 10,
+      "cv_log_loss": 0.24729
+    },
+    {
+      "n_estimators": 1000,
+      "learning_rate": 0.02,
+      "max_depth": 4,
+      "min_child_weight": 20,
+      "cv_log_loss": 0.24732
+    },
+    {
+      "n_estimators": 800,
+      "learning_rate": 0.03,
+      "max_depth": 5,
+      "min_child_weight": 20,
+      "cv_log_loss": 0.24899
+    },
+    {
+      "n_estimators": 1500,
+      "learning_rate": 0.02,
+      "max_depth": 5,
+      "min_child_weight": 30,
+      "cv_log_loss": 0.24942
+    }
+  ],
+  "cross_validation": {
     "Baseline (always the average)": {
-      "log_loss": 0.3002,
-      "brier": 0.0811,
-      "roc_auc": 0.4892
+      "log_loss": 0.3112,
+      "brier": 0.085,
+      "roc_auc": 0.4936
     },
     "Logistic regression (distance + angle)": {
-      "log_loss": 0.2715,
-      "brier": 0.0754,
-      "roc_auc": 0.7308
+      "log_loss": 0.2756,
+      "brier": 0.0775,
+      "roc_auc": 0.7459
     },
     "Logistic regression (all features)": {
       "log_loss": 0.2493,
-      "brier": 0.0699,
-      "roc_auc": 0.7924
+      "brier": 0.0707,
+      "roc_auc": 0.8103
     },
-    "XGBoost (basic features)": {
-      "log_loss": 0.261,
-      "brier": 0.073,
-      "roc_auc": 0.7633
+    "XGBoost (no player positions)": {
+      "log_loss": 0.2614,
+      "brier": 0.0741,
+      "roc_auc": 0.7855
     },
-    "XGBoost (+ defender and keeper geometry)": {
-      "log_loss": 0.2484,
+    "XGBoost (+ defender and keeper positions)": {
+      "log_loss": 0.2461,
+      "brier": 0.0697,
+      "roc_auc": 0.8159
+    },
+    "XGBoost (+ goalkeeper kinematics)": {
+      "log_loss": 0.2467,
       "brier": 0.0698,
-      "roc_auc": 0.7944
+      "roc_auc": 0.8146
     },
     "StatsBomb xG (benchmark)": {
-      "log_loss": 0.2442,
-      "brier": 0.0677,
-      "roc_auc": 0.7962
+      "log_loss": 0.247,
+      "brier": 0.0693,
+      "roc_auc": 0.8123
     }
   },
+  "held_out_test": {
+    "Baseline (always the average)": {
+      "log_loss": 0.3396,
+      "brier": 0.0952,
+      "roc_auc": 0.5
+    },
+    "Logistic regression (distance + angle)": {
+      "log_loss": 0.2971,
+      "brier": 0.0858,
+      "roc_auc": 0.7569
+    },
+    "Logistic regression (all features)": {
+      "log_loss": 0.2659,
+      "brier": 0.0772,
+      "roc_auc": 0.8255
+    },
+    "XGBoost (no player positions)": {
+      "log_loss": 0.2824,
+      "brier": 0.0817,
+      "roc_auc": 0.7896
+    },
+    "XGBoost (+ defender and keeper positions)": {
+      "log_loss": 0.2634,
+      "brier": 0.076,
+      "roc_auc": 0.823
+    },
+    "XGBoost (+ goalkeeper kinematics)": {
+      "log_loss": 0.2633,
+      "brier": 0.0756,
+      "roc_auc": 0.821
+    },
+    "StatsBomb xG (benchmark)": {
+      "log_loss": 0.2665,
+      "brier": 0.0762,
+      "roc_auc": 0.8148
+    }
+  },
+  "test_log_loss_95_interval": {
+    "ours": [
+      0.2294,
+      0.3001
+    ],
+    "statsbomb": [
+      0.2337,
+      0.3015
+    ],
+    "difference": [
+      -0.0107,
+      0.004
+    ],
+    "share_of_resamples_we_win": 0.787
+  },
+  "test_correlation_with_statsbomb": 0.9165,
   "feature_importance": {
-    "gk_dist_to_shot": 0.3889000117778778,
-    "angle_deg": 0.36959999799728394,
-    "free_angle_deg": 0.33070001006126404,
-    "nearest_defender_dist": 0.19820000231266022,
-    "gk_dist_from_goal": 0.17640000581741333,
-    "distance": 0.17229999601840973,
-    "is_header": 0.1517000049352646,
-    "open_goal_fraction": 0.11509999632835388,
-    "is_volley": 0.10090000182390213,
-    "gk_off_line": 0.09369999915361404,
-    "defenders_in_cone": 0.030700000002980232,
-    "first_time": 0.007300000172108412,
-    "under_pressure": 0.003599999938160181,
-    "from_counter": 0.0027000000700354576,
-    "is_free_kick": 0.0
+    "gk_dist_to_shot": 0.5400999784469604,
+    "angle_deg": 0.392300009727478,
+    "free_angle_deg": 0.2775000035762787,
+    "nearest_defender_dist": 0.22630000114440918,
+    "is_header": 0.22360000014305115,
+    "distance": 0.17659999430179596,
+    "gk_dist_from_goal": 0.15539999306201935,
+    "open_goal_fraction": 0.10970000177621841,
+    "defenders_in_cone": 0.10090000182390213,
+    "is_volley": 0.09989999979734421,
+    "gk_off_line": 0.08410000056028366,
+    "first_time": 0.04039999842643738,
+    "is_free_kick": 0.02539999969303608,
+    "under_pressure": 0.02199999988079071,
+    "from_counter": 0.005799999926239252
   }
 }

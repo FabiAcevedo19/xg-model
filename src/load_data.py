@@ -9,24 +9,30 @@ Run from the project folder:
 """
 
 import json
-import warnings
+import time
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 import pandas as pd
-from statsbombpy import sb
+import requests
 
-# statsbombpy warns that we're using the free data without a login. That's fine.
-warnings.filterwarnings("ignore", message="credentials were not supplied")
+# The data is a public GitHub repository of JSON files:
+#   matches/<competition>/<season>.json   the list of matches
+#   events/<match_id>.json                everything that happened in a match
+BASE_URL = "https://raw.githubusercontent.com/statsbomb/open-data/master/data"
 
 DATA_DIR = Path(__file__).resolve().parent.parent / "data"
 SHOTS_FILE = DATA_DIR / "shots.csv"
 
-# (competition_id, season_id) pairs. Find more with sb.competitions().
+# (competition_id, season_id) pairs. The full list is in competitions.json.
 #
-# StatsBomb's free data only has two recent World Cups in full (2018, 2022).
-# 2010, 2014 and 2026 are not in the free release. To get more shots we add
-# the other big men's international tournaments from 2020 to 2024.
-# Delete a line here (and delete data/shots.csv) to leave a tournament out.
+# We only use competitions where StatsBomb released EVERY match. Their free
+# data also has hundreds of Barcelona-only matches (the "Messi data"), but a
+# model trained on those would mostly learn how Messi finishes.
+#
+# International tournaments. 2010, 2014 and 2026 World Cups are not free.
+# Club football: complete 2015/16 seasons of four big European leagues.
+# Delete a line here (and delete data/shots.csv) to leave a competition out.
 COMPETITIONS = {
     "World Cup 2022": (43, 106),
     "World Cup 2018": (43, 3),
@@ -34,27 +40,11 @@ COMPETITIONS = {
     "Euro 2020": (55, 43),
     "Copa America 2024": (223, 282),
     "African Cup of Nations 2023": (1267, 107),
+    "Premier League 2015/16": (2, 27),
+    "La Liga 2015/16": (11, 27),
+    "Serie A 2015/16": (12, 27),
+    "Ligue 1 2015/16": (7, 27),
 }
-
-# The columns we keep, renamed to something shorter.
-COLUMNS = {
-    "match_id": "match_id",
-    "period": "period",  # 1-2 normal time, 3-4 extra time, 5 penalty shootout
-    "minute": "minute",
-    "team": "team",
-    "player": "player",
-    "shot_outcome": "outcome",
-    "shot_body_part": "body_part",
-    "shot_type": "shot_type",  # Open Play, Penalty, Free Kick, Corner
-    "shot_technique": "technique",
-    "under_pressure": "under_pressure",
-    "shot_first_time": "first_time",
-    "shot_statsbomb_xg": "statsbomb_xg",  # StatsBomb's own model: our benchmark
-    "play_pattern": "play_pattern",  # Regular Play, From Counter, From Corner...
-    # The "freeze frame": where every nearby player stood when the shot was hit.
-    "shot_freeze_frame": "freeze_frame",
-}
-
 
 def _freeze_frame_to_text(frame) -> str:
     """Turn a freeze frame into compact JSON text so it fits in a CSV cell.
@@ -70,42 +60,71 @@ def _freeze_frame_to_text(frame) -> str:
     ])
 
 
+def _get_json(path: str):
+    """Fetch one JSON file from the open-data repository, retrying on errors."""
+    for attempt in range(4):
+        try:
+            response = requests.get(f"{BASE_URL}/{path}", timeout=60)
+            response.raise_for_status()
+            return response.json()
+        except requests.RequestException:
+            if attempt == 3:
+                raise
+            time.sleep(2 * (attempt + 1))
+
+
+def _name(event_part, key):
+    """StatsBomb stores labels as {"id": 87, "name": "Open Play"}. Get the name."""
+    return (event_part.get(key) or {}).get("name")
+
+
+def _shots_from_match(match_id: int) -> list[dict]:
+    """Download one match (about 3,500 events) and keep just its shots."""
+    rows = []
+    for event in _get_json(f"events/{match_id}.json"):
+        if event["type"]["name"] != "Shot":
+            continue
+        shot = event["shot"]
+        rows.append({
+            "match_id": match_id,
+            "period": event["period"],  # 1-2 normal time, 3-4 extra time, 5 shootout
+            "minute": event["minute"],
+            "team": _name(event, "team"),
+            "player": _name(event, "player"),
+            "outcome": _name(shot, "outcome"),
+            "body_part": _name(shot, "body_part"),
+            "shot_type": _name(shot, "type"),  # Open Play, Penalty, Free Kick, Corner
+            "technique": _name(shot, "technique"),
+            "under_pressure": bool(event.get("under_pressure", False)),
+            "first_time": bool(shot.get("first_time", False)),
+            "statsbomb_xg": shot["statsbomb_xg"],  # StatsBomb's own model: our benchmark
+            "play_pattern": _name(event, "play_pattern"),
+            # Where every nearby player stood when the shot was hit.
+            "freeze_frame": _freeze_frame_to_text(shot.get("freeze_frame")),
+            "x": event["location"][0],
+            "y": event["location"][1],
+        })
+    return rows
+
+
 def download_shots() -> pd.DataFrame:
     """Download every shot from the competitions listed above."""
     all_shots = []
     for name, (competition_id, season_id) in COMPETITIONS.items():
-        matches = sb.matches(competition_id=competition_id, season_id=season_id)
-        print(f"{name}: {len(matches)} matches")
-
-        for i, match_id in enumerate(matches["match_id"], start=1):
-            events = sb.events(match_id=match_id)
-            shots = events[events["type"] == "Shot"].copy()
-
-            # "location" is a list [x, y]. Split it into two number columns.
-            shots["x"] = shots["location"].str[0]
-            shots["y"] = shots["location"].str[1]
-
-            # Some columns only exist if the thing happened in that match.
-            for col in COLUMNS:
-                if col not in shots.columns:
-                    shots[col] = None
-
-            shots = shots[list(COLUMNS) + ["x", "y"]].rename(columns=COLUMNS)
-            shots["freeze_frame"] = shots["freeze_frame"].map(_freeze_frame_to_text)
-            shots["competition"] = name
-            all_shots.append(shots)
-            print(f"  match {i}/{len(matches)}: {len(shots)} shots", end="\r")
-        print()
+        matches = _get_json(f"matches/{competition_id}/{season_id}.json")
+        match_ids = [m["match_id"] for m in matches]
+        # Download 16 matches at a time instead of one by one.
+        with ThreadPoolExecutor(max_workers=16) as pool:
+            per_match = list(pool.map(_shots_from_match, match_ids))
+        shots = pd.DataFrame([row for rows in per_match for row in rows])
+        shots["competition"] = name
+        all_shots.append(shots)
+        print(f"{name}: {len(match_ids)} matches, {len(shots)} shots", flush=True)
 
     df = pd.concat(all_shots, ignore_index=True)
 
     # The thing we want to predict: 1 if the shot was a goal, 0 if not.
     df["is_goal"] = (df["outcome"] == "Goal").astype(int)
-
-    # Missing means "no", so fill blanks with False.
-    for col in ["under_pressure", "first_time"]:
-        df[col] = df[col].fillna(False).astype(bool)
-
     return df
 
 
@@ -123,8 +142,9 @@ def load_shots() -> pd.DataFrame:
 
 if __name__ == "__main__":
     shots = load_shots()
-    print(shots.drop(columns="freeze_frame").head())
     print(f"\n{len(shots)} shots, {shots['is_goal'].sum()} goals "
           f"({shots['is_goal'].mean():.1%} of shots score)")
-    print("\nShots per tournament:")
+    print("\nShots per competition:")
     print(shots.groupby("competition")["is_goal"].agg(shots="count", goals="sum"))
+    has_frame = (shots["freeze_frame"] != "[]").mean()
+    print(f"\nShots with player positions: {has_frame:.1%}")

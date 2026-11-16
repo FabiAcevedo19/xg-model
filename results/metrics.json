@@ -1,0 +1,54 @@
+{
+  "n_shots": 7509,
+  "n_goals": 668,
+  "correlation_with_statsbomb": 0.8734,
+  "models": {
+    "Baseline (always the average)": {
+      "log_loss": 0.3002,
+      "brier": 0.0811,
+      "roc_auc": 0.4892
+    },
+    "Logistic regression (distance + angle)": {
+      "log_loss": 0.2715,
+      "brier": 0.0754,
+      "roc_auc": 0.7308
+    },
+    "Logistic regression (all features)": {
+      "log_loss": 0.2493,
+      "brier": 0.0699,
+      "roc_auc": 0.7924
+    },
+    "XGBoost (basic features)": {
+      "log_loss": 0.261,
+      "brier": 0.073,
+      "roc_auc": 0.7633
+    },
+    "XGBoost (+ defender and keeper geometry)": {
+      "log_loss": 0.2484,
+      "brier": 0.0698,
+      "roc_auc": 0.7944
+    },
+    "StatsBomb xG (benchmark)": {
+      "log_loss": 0.2442,
+      "brier": 0.0677,
+      "roc_auc": 0.7962
+    }
+  },
+  "feature_importance": {
+    "gk_dist_to_shot": 0.3889000117778778,
+    "angle_deg": 0.36959999799728394,
+    "free_angle_deg": 0.33070001006126404,
+    "nearest_defender_dist": 0.19820000231266022,
+    "gk_dist_from_goal": 0.17640000581741333,
+    "distance": 0.17229999601840973,
+    "is_header": 0.1517000049352646,
+    "open_goal_fraction": 0.11509999632835388,
+    "is_volley": 0.10090000182390213,
+    "gk_off_line": 0.09369999915361404,
+    "defenders_in_cone": 0.030700000002980232,
+    "first_time": 0.007300000172108412,
+    "under_pressure": 0.003599999938160181,
+    "from_counter": 0.0027000000700354576,
+    "is_free_kick": 0.0
+  }
+}

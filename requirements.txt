@@ -1,0 +1,10 @@
+statsbombpy
+pandas
+numpy
+matplotlib
+mplsoccer
+scikit-learn
+xgboost
+streamlit
+jupyter
+pytest

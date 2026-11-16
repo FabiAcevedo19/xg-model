@@ -8,7 +8,18 @@ A machine learning model that predicts the probability that a soccer shot become
 
 ![Shot map](figures/shot_map_world_cup_2022.png)
 
-> 🚧 Work in progress. Live demo link goes here once the app is deployed.
+> 🚧 Live demo link goes here once the app is deployed. Until then, run it locally with `streamlit run app.py`.
+
+## The app
+
+[app.py](app.py) is an interactive explorer. Click on the pitch to move the ball, the goalkeeper and defenders, and the xG updates.
+
+- **Six preset situations**, from a one-on-one to a crowded penalty box.
+- **Replay the 2022 World Cup final**: load any of its 27 non-penalty shots with the real player positions, and compare the model's xG with StatsBomb's and with what happened.
+- **Ray casting, drawn**: clear paths to goal are shown in yellow, blocked ones are faint.
+- **"Why this number?"**: a SHAP chart shows how much each input pushed this prediction up or down.
+
+The deployed model is trained on all the data, so the shots from the final are ones it has seen. The out-of-sample results are in the tables below.
 
 ## What is xG?
 
@@ -102,7 +113,7 @@ They did not help. Cross-validated log-loss was 0.2467 with them and 0.2461 with
 - [x] Better model: XGBoost with monotonic constraints
 - [x] Evaluate: held-out tournament, grouped cross-validation, bootstrap intervals
 - [x] Unit tests and continuous integration
-- [ ] Interactive Streamlit app: place the ball, defenders and keeper, get the xG
+- [x] Interactive Streamlit app: place the ball, defenders and keeper, get the xG
 - [ ] Deploy to Hugging Face Spaces
 - [ ] Analysis: which players outperformed their xG?
 
@@ -118,17 +129,23 @@ pip install -r requirements.txt
 python src/load_data.py       # downloads shots to data/shots.csv (a few minutes)
 python src/shot_map.py        # draws the shot map
 python src/train.py           # tunes, trains and compares the models
-python -m pytest              # runs the geometry tests
+python -m pytest              # runs the tests
+streamlit run app.py          # opens the app in your browser
 ```
+
+The app works straight after installing: the trained model and the sample shots are in the repository, so the download and training steps are optional.
 
 ## Project structure
 
 ```
+app.py               the interactive Streamlit app
+app_data/            shots from the 2022 World Cup final, for the app
 src/load_data.py     download and clean the shots
 src/features.py      geometry, ray casting and goalkeeper features
 src/train.py         tune, cross-validate, test and save models
 src/shot_map.py      draw shots on a pitch
-tests/               unit tests for the geometry
+src/make_samples.py  save the World Cup final shots for the app
+tests/               unit tests for the geometry, smoke tests for the app
 notebooks/           step-by-step exploration
 figures/             saved plots
 models/              the trained model
@@ -147,4 +164,4 @@ Only competitions released in full are used. The free data also contains several
 
 ## Tech
 
-Python, pandas, NumPy, scikit-learn, XGBoost, mplsoccer, pytest, GitHub Actions, Streamlit
+Python, pandas, NumPy, scikit-learn, XGBoost, Streamlit, Plotly, mplsoccer, pytest, GitHub Actions

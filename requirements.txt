@@ -8,3 +8,4 @@ xgboost
 streamlit
 jupyter
 pytest
+plotly

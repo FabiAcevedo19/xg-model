@@ -94,6 +94,29 @@ The difference in log-loss between the final model and StatsBomb is −0.003, wi
 |---|---|
 | ![Calibration](figures/calibration.png) | ![Feature importance](figures/feature_importance.png) |
 
+## Analysis: who beat their xG in 2015/16?
+
+With a calibrated model, goals minus xG measures finishing: did a player score more than his chances were worth? [src/analyze_players.py](src/analyze_players.py) computes it for the 189 players with at least 50 non-penalty shots in the four 2015/16 league seasons. Every shot's xG comes from a model that was not trained on that shot's match.
+
+![Finishing above and below expectation](figures/finishing_2015_16.png)
+
+| Player | Team | Non-penalty goals | xG | Goals − xG | z-score |
+|---|---|---|---|---|---|
+| Luis Suárez | Barcelona | 37 | 26.4 | +10.6 | 2.7 |
+| Zlatan Ibrahimović | Paris Saint-Germain | 31 | 21.4 | +9.6 | 2.5 |
+| Gonzalo Higuaín | Napoli | 33 | 24.0 | +9.0 | 2.2 |
+| Gareth Bale | Real Madrid | 19 | 10.1 | +8.9 | 3.3 |
+| Antoine Griezmann | Atlético Madrid | 21 | 14.0 | +7.0 | 2.3 |
+| ... | | | | | |
+| Giampaolo Pazzini | Hellas Verona | 3 | 7.7 | −4.7 | −1.9 |
+| Edin Džeko | AS Roma | 6 | 12.0 | −6.0 | −2.2 |
+
+The z-score is the difference divided by the standard deviation luck alone would produce, `sqrt(Σ p(1 − p))` over the player's shots.
+
+- **Most of it is luck.** Only 13 of 189 players (7%) are more than 2 standard deviations from their xG. Chance alone predicts about 5%. One season is rarely enough to call someone a good or bad finisher.
+- **The exceptions are who you would expect.** The top of the list is the season's elite forwards, and Gareth Bale's 19 goals from 10.1 xG is the largest outlier relative to luck.
+- **The ranking does not depend on this model.** Recomputing it with StatsBomb's xG gives a correlation of 0.97.
+
 ### A negative result: goalkeeper kinematics
 
 I tested a physics-based model of saves. The ball and the keeper race each other: the ball travels each ray at a fixed speed, and the keeper, after a 0.25 s reaction time, moves at about 5 m/s. A ray is "saveable" if the keeper can reach any point on it before the ball does. This produced two features, the unsaveable fraction of the goal and the resulting scoring window.
@@ -118,7 +141,7 @@ They did not help. Cross-validated log-loss was 0.2467 with them and 0.2461 with
 - [x] Unit tests and continuous integration
 - [x] Interactive Streamlit app: place the ball, defenders and keeper, get the xG
 - [x] Deploy to Streamlit Community Cloud
-- [ ] Analysis: which players outperformed their xG?
+- [x] Analysis: which players outperformed their xG?
 
 ## Run it yourself
 
@@ -132,6 +155,7 @@ pip install -r requirements-dev.txt
 python src/load_data.py       # downloads shots to data/shots.csv (a few minutes)
 python src/shot_map.py        # draws the shot map
 python src/train.py           # tunes, trains and compares the models
+python src/analyze_players.py # who beat their xG in 2015/16
 python -m pytest              # runs the tests
 streamlit run app.py          # opens the app in your browser
 ```
@@ -147,6 +171,7 @@ src/load_data.py     download and clean the shots
 src/features.py      geometry, ray casting and goalkeeper features
 src/train.py         tune, cross-validate, test and save models
 src/shot_map.py      draw shots on a pitch
+src/analyze_players.py  goals versus xG per player
 src/make_samples.py  save the World Cup final shots for the app
 tests/               unit tests for the geometry, smoke tests for the app
 notebooks/           step-by-step exploration

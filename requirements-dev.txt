@@ -1,0 +1,7 @@
+# Everything: the app's requirements plus what training, plots and tests need.
+-r requirements.txt
+requests
+matplotlib
+mplsoccer
+jupyter
+pytest

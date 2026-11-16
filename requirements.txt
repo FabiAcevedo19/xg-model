@@ -1,11 +1,8 @@
-requests
-pandas
-numpy
-matplotlib
-mplsoccer
-scikit-learn
-xgboost
-streamlit
-jupyter
-pytest
-plotly
+# What the app needs to run. The hosting service installs exactly this file,
+# so it is kept small. For training, plots and tests use requirements-dev.txt.
+streamlit>=1.40
+xgboost>=3.0
+scikit-learn>=1.5
+pandas>=2.2
+numpy>=2.0
+plotly>=5.20

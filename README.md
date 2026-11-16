@@ -124,7 +124,7 @@ Use Python 3.12 to 3.14.
 ```bash
 python -m venv .venv
 .venv\Scripts\activate        # macOS/Linux: source .venv/bin/activate
-pip install -r requirements.txt
+pip install -r requirements-dev.txt
 
 python src/load_data.py       # downloads shots to data/shots.csv (a few minutes)
 python src/shot_map.py        # draws the shot map
@@ -133,7 +133,7 @@ python -m pytest              # runs the tests
 streamlit run app.py          # opens the app in your browser
 ```
 
-The app works straight after installing: the trained model and the sample shots are in the repository, so the download and training steps are optional.
+The app works straight after installing: the trained model and the sample shots are in the repository, so the download and training steps are optional. To run only the app, `pip install -r requirements.txt` is enough.
 
 ## Project structure
 
